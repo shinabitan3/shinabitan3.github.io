@@ -28,35 +28,6 @@
             color: #2c3e50;
             text-align: center;
         }
-        .input-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            gap: 15px;
-            margin-bottom: 30px;
-        }
-        .input-row {
-            display: flex;
-            flex-direction: column;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            padding: 10px;
-            background-color: #f9f9f9;
-        }
-        .input-row label {
-            margin-bottom: 5px;
-            font-weight: bold;
-            color: #555;
-        }
-        .input-row input {
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            margin-bottom: 8px;
-        }
-        .add-remove-buttons {
-            text-align: center;
-            margin: 20px 0;
-        }
         .options-area {
             display: flex;
             justify-content: space-between;
@@ -95,21 +66,33 @@
         button.remove-btn:hover {
             background-color: #c0392b;
         }
+        button.active {
+            background-color: #2c3e50;
+            font-weight: bold;
+        }
         .action-buttons {
             text-align: center;
             margin: 20px 0;
         }
-        #results-table {
+        .mode-selector {
+            display: flex;
+            justify-content: center;
+            margin: 15px 0;
+            background-color: #f9f9f9;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
         }
-        #results-table th, #results-table td {
+        table th, table td {
             border: 1px solid #ddd;
             padding: 12px;
             text-align: left;
         }
-        #results-table th {
+        table th {
             background-color: #f2f2f2;
             position: sticky;
             top: 0;
@@ -117,7 +100,7 @@
         .qr-cell {
             text-align: center;
         }
-        .results-container {
+        .results-container, .input-container {
             margin-top: 30px;
             overflow-x: auto;
         }
@@ -172,10 +155,59 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        .input-cell {
+            padding: 0;
+        }
+        .input-cell input {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            box-sizing: border-box;
+            font-family: inherit;
+            font-size: inherit;
+        }
+        .input-cell input:focus {
+            outline: 2px solid #3498db;
+        }
+        .excel-paste-area {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .paste-textarea {
+            width: 90%;
+            height: 100px;
+            padding: 10px;
+            border: 1px dashed #aaa;
+            border-radius: 5px;
+            font-family: inherit;
+            font-size: inherit;
+            margin-bottom: 10px;
+        }
+        .mode-button {
+            padding: 10px 20px;
+            margin: 0 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        .mode-button:not(.active) {
+            background-color: #e0e0e0;
+            color: #333;
+        }
+        .mode-button.active {
+            background-color: #3498db;
+            color: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        .date-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
         @media (max-width: 768px) {
-            .input-grid {
-                grid-template-columns: 1fr;
-            }
             .options-area {
                 flex-direction: column;
             }
@@ -183,30 +215,23 @@
                 padding: 15px;
             }
         }
-        .debug-info {
-            font-family: monospace;
-            font-size: 12px;
-            color: #666;
-            margin-top: 5px;
-            word-break: break-all;
-        }
-        .url-length {
-            font-size: 12px;
-            color: #888;
-            margin-top: 2px;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>QRコードメーカー</h1>
         
+        <div class="mode-selector">
+            <button id="url-mode-btn" class="mode-button active" onclick="switchMode('url')">URLモード</button>
+            <button id="text-mode-btn" class="mode-button" onclick="switchMode('text')">テキストモード</button>
+        </div>
+        
         <div class="options-area">
             <div class="option-group">
                 <label>QRコードサイズ:</label>
                 <select id="qr-size">
-                    <option value="150">小 (150px)</option>
-                    <option value="200" selected>中 (200px)</option>
+                    <option value="150" selected>小 (150px)</option>
+                    <option value="200">中 (200px)</option>
                     <option value="300">大 (300px)</option>
                 </select>
             </div>
@@ -228,13 +253,33 @@
             </div>
         </div>
         
-        <div class="add-remove-buttons">
-            <button class="add-btn" onclick="addInputRows(5)">入力欄を5つ追加</button>
-            <button class="remove-btn" onclick="removeLastInputRows(5)">入力欄を5つ削除</button>
+        <div class="excel-paste-area">
+            <h3>Excelからのデータ貼り付け</h3>
+            <p class="help-text">Excelでコピーしたセルをこちらのテキストエリアに貼り付けて「テーブルに反映」ボタンをクリックしてください</p>
+            <textarea id="excel-paste" class="paste-textarea" placeholder="ここにExcelからコピーしたデータを貼り付けてください"></textarea>
+            <button onclick="parseExcelPaste()">テーブルに反映</button>
         </div>
         
-        <div id="input-container" class="input-grid">
-            <!-- 入力欄がここに生成されます -->
+        <div class="action-buttons">
+            <button class="add-btn" onclick="addTableRow(5)">行を5つ追加</button>
+            <button class="remove-btn" onclick="removeTableRows(5)">行を5つ削除</button>
+        </div>
+        
+        <div class="input-container">
+            <h2>入力テーブル</h2>
+            <table id="input-table">
+                <thead>
+                    <tr>
+                        <th>No.</th>
+                        <th id="content-type-header">QRコード内容 (URL)</th>
+                        <th>詳細</th>
+                        <th>作成日</th>
+                    </tr>
+                </thead>
+                <tbody id="input-tbody">
+                    <!-- 入力行がここに生成されます -->
+                </tbody>
+            </table>
         </div>
         
         <div class="action-buttons">
@@ -256,10 +301,10 @@
                 <thead>
                     <tr>
                         <th>No.</th>
-                        <th>QRコード内容</th>
-                        <th>説明またはタイトル</th>
+                        <th id="result-content-type-header">QRコード内容</th>
+                        <th>詳細</th>
                         <th>QRコード</th>
-                        <th>QRコードURL</th>
+                        <th id="result-url-header">作成日</th>
                     </tr>
                 </thead>
                 <tbody id="results-body">
@@ -273,67 +318,160 @@
         // QRコードのデータを保存する配列
         let qrCodesData = [];
         let templateWorkbook = null;
-        let inputRowCount = 0;
+        let rowCount = 0;
+        let currentMode = 'url'; // 'url' または 'text'
         
-        // ページ読み込み時に初期入力欄を追加
+        // 今日の日付を取得
+        function getTodayDate() {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+        
+        // ページ読み込み時に初期入力行を追加
         window.onload = function() {
-            addInputRows(20); // 初期値として20個の入力欄を追加
+            addTableRow(10); // 初期値として10行の入力欄を追加
         };
         
-        // 入力欄を追加
-        function addInputRows(count) {
-            const container = document.getElementById('input-container');
+        // モードを切り替える
+        function switchMode(mode) {
+            if (mode === currentMode) return;
+            
+            currentMode = mode;
+            
+            // ボタンの見た目を更新
+            document.getElementById('url-mode-btn').classList.toggle('active', mode === 'url');
+            document.getElementById('text-mode-btn').classList.toggle('active', mode === 'text');
+            
+            // ヘッダーテキストを更新
+            const contentHeader = document.getElementById('content-type-header');
+            const resultContentHeader = document.getElementById('result-content-type-header');
+            
+            if (mode === 'url') {
+                contentHeader.textContent = 'QRコード内容 (URL)';
+                resultContentHeader.textContent = 'QRコード内容';
+            } else {
+                contentHeader.textContent = 'QRコード内容 (テキスト)';
+                resultContentHeader.textContent = 'QRコード内容';
+            }
+            
+            // プレースホルダーテキストを更新
+            const inputRows = document.querySelectorAll('.input-cell input[id^="url-"]');
+            inputRows.forEach(input => {
+                input.placeholder = mode === 'url' ? 'https://example.com' : 'テキストを入力してください';
+            });
+            
+            showStatus(`${mode === 'url' ? 'URL' : 'テキスト'}モードに切り替えました`, 'success');
+        }
+        
+        // 入力テーブルに行を追加
+        function addTableRow(count) {
+            const tbody = document.getElementById('input-tbody');
+            const today = getTodayDate();
             
             for (let i = 0; i < count; i++) {
-                inputRowCount++;
+                rowCount++;
                 
-                const rowDiv = document.createElement('div');
-                rowDiv.className = 'input-row';
-                rowDiv.id = `input-row-${inputRowCount}`;
+                const row = document.createElement('tr');
+                row.id = `row-${rowCount}`;
                 
-                rowDiv.innerHTML = `
-                    <label>URL ${inputRowCount}:</label>
-                    <input type="text" id="url-${inputRowCount}" placeholder="https://example.com" class="url-input" oninput="updateUrlLength(${inputRowCount})">
-                    <div id="url-length-${inputRowCount}" class="url-length"></div>
-                    <label>説明/タイトル ${inputRowCount}:</label>
-                    <input type="text" id="desc-${inputRowCount}" placeholder="説明またはタイトル（任意）" class="desc-input">
+                row.innerHTML = `
+                    <td>${rowCount}</td>
+                    <td class="input-cell">
+                        <input type="text" id="url-${rowCount}" placeholder="${currentMode === 'url' ? 'https://example.com' : 'テキストを入力してください'}">
+                    </td>
+                    <td class="input-cell">
+                        <input type="text" id="desc-${rowCount}" placeholder="詳細（任意）">
+                    </td>
+                    <td class="input-cell">
+                        <input type="date" id="date-${rowCount}" value="${today}" class="date-input">
+                    </td>
                 `;
                 
-                container.appendChild(rowDiv);
+                tbody.appendChild(row);
             }
         }
         
-        // URLの長さを表示
-        function updateUrlLength(rowId) {
-            const urlInput = document.getElementById(`url-${rowId}`);
-            const urlLengthDiv = document.getElementById(`url-length-${rowId}`);
+        // Excelの貼り付けデータを解析してテーブルに反映
+        function parseExcelPaste() {
+            const pasteData = document.getElementById('excel-paste').value.trim();
+            if (!pasteData) {
+                showStatus('貼り付けるデータがありません', 'error');
+                return;
+            }
             
-            if (urlInput && urlLengthDiv) {
-                const urlLength = urlInput.value.length;
-                urlLengthDiv.textContent = `文字数: ${urlLength}文字`;
-                
-                // 警告表示
-                if (urlLength > 500) {
-                    urlLengthDiv.style.color = '#e74c3c';
-                } else if (urlLength > 300) {
-                    urlLengthDiv.style.color = '#f39c12';
-                } else {
-                    urlLengthDiv.style.color = '#888';
-                }
+            // 行に分割
+            const rows = pasteData.split(/\r?\n/);
+            if (rows.length === 0) {
+                showStatus('有効なデータが見つかりません', 'error');
+                return;
             }
+            
+            // 入力テーブルをクリア
+            document.getElementById('input-tbody').innerHTML = '';
+            rowCount = 0;
+            
+            // 必要な行数を追加
+            addTableRow(rows.length);
+            
+            // データを入力
+            rows.forEach((row, index) => {
+                const rowNum = index + 1;
+                const cells = row.split(/\t/);
+                
+                // URLまたはテキストを設定（最初の列）
+                if (cells.length > 0 && cells[0]) {
+                    const urlInput = document.getElementById(`url-${rowNum}`);
+                    if (urlInput) {
+                        urlInput.value = cells[0].trim();
+                    }
+                }
+                
+                // 詳細を設定（2番目の列があれば）
+                if (cells.length > 1 && cells[1]) {
+                    const descInput = document.getElementById(`desc-${rowNum}`);
+                    if (descInput) {
+                        descInput.value = cells[1].trim();
+                    }
+                }
+                
+                // 作成日を設定（3番目の列があれば）
+                if (cells.length > 2 && cells[2]) {
+                    const dateInput = document.getElementById(`date-${rowNum}`);
+                    if (dateInput) {
+                        // 日付形式の変換を試みる
+                        try {
+                            const dateStr = cells[2].trim();
+                            const dateObj = new Date(dateStr);
+                            if (!isNaN(dateObj.getTime())) {
+                                const yyyy = dateObj.getFullYear();
+                                const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+                                const dd = String(dateObj.getDate()).padStart(2, '0');
+                                dateInput.value = `${yyyy}-${mm}-${dd}`;
+                            }
+                        } catch (e) {
+                            console.warn('日付形式の変換に失敗しました:', cells[2]);
+                        }
+                    }
+                }
+            });
+            
+            showStatus(`${rows.length}行のデータをテーブルに反映しました`, 'success');
         }
         
-        // 入力欄を削除
-        function removeLastInputRows(count) {
-            const container = document.getElementById('input-container');
+        // 入力テーブルから行を削除
+        function removeTableRows(count) {
+            const tbody = document.getElementById('input-tbody');
             
             for (let i = 0; i < count; i++) {
-                if (inputRowCount <= 0) break;
+                if (rowCount <= 0) break;
                 
-                const lastRow = document.getElementById(`input-row-${inputRowCount}`);
-                if (lastRow) {
-                    container.removeChild(lastRow);
-                    inputRowCount--;
+                const row = document.getElementById(`row-${rowCount}`);
+                if (row) {
+                    tbody.removeChild(row);
+                    rowCount--;
                 }
             }
         }
@@ -362,25 +500,29 @@
             qrCodesData = [];
             let hasData = false;
             
-            // 入力欄からデータを収集
-            for (let i = 1; i <= inputRowCount; i++) {
+            // 入力テーブルからデータを収集
+            for (let i = 1; i <= rowCount; i++) {
                 const urlInput = document.getElementById(`url-${i}`);
                 const descInput = document.getElementById(`desc-${i}`);
+                const dateInput = document.getElementById(`date-${i}`);
                 
                 if (urlInput && urlInput.value.trim()) {
-                    let url = urlInput.value.trim();
+                    let content = urlInput.value.trim();
                     const description = descInput ? descInput.value.trim() : '';
+                    const creationDate = dateInput ? dateInput.value : getTodayDate();
                     
-                    // URLの簡易検証
-                    if (!url.match(/^https?:\/\/.+/i)) {
-                        url = 'http://' + url; // プロトコルがなければ追加
+                    // URLモードの場合、プロトコルがなければ追加
+                    if (currentMode === 'url' && !content.match(/^https?:\/\/.+/i)) {
+                        content = 'http://' + content;
                     }
                     
                     qrCodesData.push({
                         number: qrCodesData.length + 1,
-                        url: url,
+                        content: content,
                         description: description,
-                        qrCodeDataUrl: null
+                        creationDate: creationDate,
+                        qrCodeDataUrl: null,
+                        isUrl: currentMode === 'url'
                     });
                     
                     hasData = true;
@@ -388,7 +530,7 @@
             }
             
             if (!hasData) {
-                showStatus('URLを少なくとも1つ入力してください', 'error');
+                showStatus(`${currentMode === 'url' ? 'URL' : 'テキスト'}を少なくとも1つ入力してください`, 'error');
                 return;
             }
             
@@ -427,7 +569,7 @@
                     // QRiousを使用してQRコードを生成
                     const qr = new QRious({
                         element: canvas,
-                        value: data.url,
+                        value: data.content,
                         size: size,
                         level: errorCorrectionLevel
                     });
@@ -460,12 +602,23 @@
             qrCodesData.forEach((data, index) => {
                 const row = document.createElement('tr');
                 
+                // 日付の表示形式を整える
+                let displayDate = data.creationDate;
+                try {
+                    const dateObj = new Date(data.creationDate);
+                    if (!isNaN(dateObj.getTime())) {
+                        displayDate = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+                    }
+                } catch (e) {
+                    console.warn('日付形式の変換に失敗しました:', data.creationDate);
+                }
+                
                 row.innerHTML = `
                     <td>${data.number}</td>
-                    <td>${escapeHtml(data.url)}<div class="debug-info">長さ: ${data.url.length}文字</div></td>
+                    <td>${escapeHtml(data.content)}</td>
                     <td>${escapeHtml(data.description)}</td>
                     <td class="qr-cell" id="qr-cell-${index}"><div class="spinner"></div></td>
-                    <td>${escapeHtml(data.url)}</td>
+                    <td>${displayDate}</td>
                 `;
                 
                 tbody.appendChild(row);
@@ -480,9 +633,7 @@
             const data = qrCodesData[index];
             if (data.qrCodeDataUrl) {
                 cell.innerHTML = `
-                    <img src="${data.qrCodeDataUrl}" alt="QR Code" style="max-width: 200px;">
-                    <br>
-                    <a href="${data.qrCodeDataUrl}" download="qrcode-${index + 1}.png" class="download-link">ダウンロード</a>
+                    <img src="${data.qrCodeDataUrl}" alt="QR Code" style="max-width: 150px;">
                 `;
             }
         }
@@ -494,7 +645,6 @@
             
             cell.innerHTML = `
                 <div style="color: #e74c3c;">エラー: QRコードを生成できませんでした</div>
-                <div class="debug-info">${escapeHtml(error.message)}</div>
             `;
         }
         
@@ -530,13 +680,13 @@
                         const rowIndex = index + 2;
                         
                         // A列: QRコード内容
-                        worksheet[`A${rowIndex}`] = { t: 's', v: data.url };
+                        worksheet[`A${rowIndex}`] = { t: 's', v: data.content };
                         
-                        // B列: 説明またはタイトル
+                        // B列: 詳細
                         worksheet[`B${rowIndex}`] = { t: 's', v: data.description || '' };
                         
-                        // D列: QRコードURL
-                        worksheet[`D${rowIndex}`] = { t: 's', v: data.url };
+                        // E列: 作成日
+                        worksheet[`E${rowIndex}`] = { t: 's', v: data.creationDate || '' };
                     });
                 } else {
                     // 新しいワークブックを作成
@@ -544,12 +694,26 @@
                     
                     // データを準備
                     const wsData = [
-                        ['QRコード内容', '説明またはタイトル', 'QRコード', 'QRコードURL'],
-                        ...qrCodesData.map(data => [data.url, data.description || '', '(QRコード画像)', data.url])
+                        ['QRコード内容', '詳細', 'QRコード', '作成日'],
+                        ...qrCodesData.map(data => [data.content, data.description || '', '(QRコード画像)', data.creationDate || ''])
                     ];
                     
                     // ワークシートを作成
                     const worksheet = XLSX.utils.aoa_to_sheet(wsData);
+                    
+                    // 行の高さを設定 (SheetJSでは直接サポートされていないので擬似的に)
+                    if (!worksheet['!rows']) worksheet['!rows'] = [];
+                    for (let i = 1; i <= qrCodesData.length; i++) {
+                        worksheet['!rows'][i] = { hpt: 150 }; // 行の高さをポイント単位で指定 (約26mm)
+                    }
+                    
+                    // 列の幅を設定
+                    worksheet['!cols'] = [
+                        { wch: 40 }, // A列: QRコード内容
+                        { wch: 30 }, // B列: 詳細
+                        { wch: 26 }, // C列: QRコード (画像用の幅)
+                        { wch: 15 }  // D列: 作成日
+                    ];
                     
                     // ワークブックに追加
                     XLSX.utils.book_append_sheet(workbook, worksheet, 'QRコード一覧');
